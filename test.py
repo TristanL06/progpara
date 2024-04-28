@@ -1,24 +1,31 @@
 from PIL import Image
 import os
+import subprocess
+import time
 
-image = Image.new("RGB", (11, 11))
+def transfer_to_boole(source="", destination=""):
+    os.system("scp progParallèle/" + source + " boole:projet/" + destination)
 
-px = image.load()
+def transfer_from_boole(source, destination):
+    os.system("scp boole:projet/" + source + " progParallèle/" + destination)
 
-for i in range(11):
-    for j in range(11):
-        px[i, j] = (0, 0, 0) if (i+j)%2 == 0 else (255, 255, 255)
+def execute(commands):
+    results = ["Results:"]
+    for command in commands:
+        try:
+            # Utilisation de subprocess.check_output() pour obtenir la sortie de la commande
+            output = subprocess.check_output(["ssh", "boole", f'cd projet && {command}'], universal_newlines=True)
+            results.append(output)
+        except subprocess.CalledProcessError as e:
+            results.append(f"Error executing command: {e.output}")
+    results.append("====================================")
+    return results
 
+transfer_to_boole("projet.py")
+transfer_to_boole("input.jpg")
+print(execute(["ls -la","python3 projet.py"]))
+transfer_from_boole("output.jpg", "/output.jpg")
 
-image.save("progParallèle/test.jpg")
-
-os.system("scp progParallèle/input.jpg lt925100@boole.polytech.unice.fr:/net/home/l/lt925100/projet/input.jpg")
-
-wait = input("Press Enter to continue...")
-
-os.system("scp lt925100@boole.polytech.unice.fr:/net/home/l/lt925100/projet/output.jpg progParallèle/")
-
-image = Image.open("progParallèle/output.jpg")
 
 original = Image.open("progParallèle/input.jpg")
 transformed = Image.open("progParallèle/output.jpg")
