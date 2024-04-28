@@ -3,6 +3,8 @@ import os
 import subprocess
 import time
 
+input = "valve.png"
+
 def transfer_to_boole(source="", destination=""):
     os.system("scp ./" + source + " boole:projet/" + destination)
 
@@ -22,16 +24,17 @@ def execute(commands):
     return results
 
 transfer_to_boole("projet.py")
-transfer_to_boole("input.jpg")
+transfer_to_boole(input, "input.jpg")
 print(execute(["ls -la","python3 projet.py"]))
 transfer_from_boole("output.jpg", "/output.jpg")
 
 
-original = Image.open("input.jpg")
+original = Image.open(input)
 transformed = Image.open("output.jpg")
 
 mixed = Image.new("RGB", (original.width + transformed.width + 5, original.height), (255, 255, 255))
 mixed.paste(original, (0, 0))
 mixed.paste(transformed, (original.width + 5, 0))
-mixed.show()
 mixed.save("mixed.jpg")
+mixed = Image.open("mixed.jpg")
+mixed.show()
