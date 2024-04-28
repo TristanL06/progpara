@@ -1,35 +1,103 @@
 import numpy as np
-from numba import cuda
+from numba import cuda, float32
 from PIL import Image
 import argparse
 import time
+from math import sqrt, ceil
+
 
 # CUDA kernel functions for image processing
-# Define your CUDA kernel functions here
+# definition de tous les noyaux dont on aura besoin
+gaussian_kernel = np.array([[1, 4, 6, 4, 1],
+                            [4, 16, 24, 16, 4],
+                            [6, 24, 36, 24, 6],
+                            [4, 16, 24, 16, 4],
+                            [1, 4, 6, 4, 1]], dtype=np.float32)
 
-# Function to apply black and white kernel
+sobel_x_kernel = np.array([[-1, 0, 1],
+                           [-2, 0, 2],
+                           [-1, 0, 1]], dtype=np.float32)
+
+sobel_y_kernel = np.array([[-1, -2, -1],
+                           [0, 0, 0],
+                           [1, 2, 1]], dtype=np.float32)
+
+
+# fonction pour passer en niveaux de gris
 @cuda.jit
 def rgb_to_bw_kernel(rgb_img, bw_img):
-    pass
-    # Implement your CUDA kernel for black and white conversion here
+    x, y = cuda.grid(2)
+    if x < rgb_img.shape[0] and y < rgb_img.shape[1]:
+        R = rgb_img[x, y, 0]
+        G = rgb_img[x, y, 1]
+        B = rgb_img[x, y, 2]
+        bw_img[x, y] = 0.3 * R + 0.59 * G + 0.11 * B
 
-# Function to apply Gaussian blur kernel
+# Fonction de flou gaussien CUDA
 @cuda.jit
-def gaussian_blur_kernel(input_image, output_image, kernel):
-    pass
-    # Implement your CUDA kernel for Gaussian blur here
+def gaussian_blur_cuda(input_image, output_image, kernel):
+    x, y = cuda.grid(2)
+    if x < input_image.shape[0] and y < input_image.shape[1]:
+        output_pixel_value = 0.0
+        kernel_sum = 0.0  # Variable to store the sum of kernel weights
+        for i in range(-2, 3):
+            for j in range(-2, 3):
+                x_i = x + i
+                y_i = y + j
+                if x_i >= 0 and x_i < input_image.shape[0] and y_i >= 0 and y_i < input_image.shape[1]:
+                    output_pixel_value += input_image[x_i,
+                                                      y_i] * kernel[i + 2, j + 2]
+                    kernel_sum += kernel[i + 2, j + 2]
+        # Normalize by the sum of kernel weights
+        output_image[x, y] = output_pixel_value / kernel_sum
 
-# Function to apply Sobel kernel
+# Fonction d'application du filtre de Sobel
 @cuda.jit
-def sobel_kernel(input_image, magnitude, angle):
-    pass
-    # Implement your CUDA kernel for Sobel here
+def sobel_kernel(input_image, output_image):
+    x, y = cuda.grid(2)
+    if x >= input_image.shape[0] or y >= input_image.shape[1]:
+        return
+        # Appliquer le filtre de Sobel
+    Gx = float32(0.0)
+    Gy = float32(0.0)
+    for k in range(-1, 2):
+        for l in range(-1, 2):
+            if x + k > 0 and x + k <= input_image.shape[0] and y + l > 0 and y + l <= input_image.shape[1]:
+                Gx += input_image[x + k, y + l] * sobel_x_kernel[k + 1, l + 1]
+                Gy += input_image[x + k, y + l] * sobel_y_kernel[k + 1, l + 1]
+    output_image[x, y] = min(sqrt(Gx**2 + Gy**2), 175)
 
-# Function to apply threshold kernel
+
 @cuda.jit
-def threshold_kernel(magnitude, threshold_low, threshold_high):
-    pass
-    # Implement your CUDA kernel for thresholding here
+def threshold_kernel(input_image, threshold_low, threshold_high, output_image):
+    x, y = cuda.grid(2)
+    if x < input_image.shape[0] and y < input_image.shape[1]:
+        if input_image[x, y] < threshold_low / 255:
+            output_image[x, y] = 0  # Edge below low threshold
+        elif input_image[x, y] > threshold_high / 255:
+            output_image[x, y] = 255  # Edge above high threshold
+        else:
+            output_image[x, y] = 128  # Potential edge between thresholds
+
+@cuda.jit
+def hysteresis(input_image, output_image):
+    x, y = cuda.grid(2)
+    if x >= input_image.shape[0] or y >= input_image.shape[1]:
+        return
+    if input_image[x, y] > 254:
+        output_image[x, y] = 1
+        return
+    if input_image[x, y] < 1:
+        output_image[x, y] = 0
+        return
+    for k in range(-1, 2):
+        for l in range(-1, 2):
+            if x + k > 0 and x + k <= input_image.shape[0] and y + l > 0 and y + l <= input_image.shape[1]:
+                if input_image[x+k, y+l] > 254:
+                    output_image[x, y] = 1
+                    return
+    output_image[x, y] = 0; 
+
 
 # Parse command-line arguments
 def parse_args():
@@ -56,6 +124,8 @@ def main():
 
     # Initialize CUDA device arrays
     d_input_image = cuda.to_device(input_image)
+    blurred_image = cuda.to_device(input_image)
+    
     d_output_image = cuda.to_device(output_image)
 
     # Define block and grid dimensions

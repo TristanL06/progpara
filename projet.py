@@ -30,8 +30,6 @@ def rgb_to_bw_kernel(rgb_img, bw_img):
         bw_img[x, y] = 0.3 * R + 0.59 * G + 0.11 * B
 
 # Fonction de flou gaussien CUDA
-
-
 @cuda.jit
 def gaussian_blur_cuda(input_image, output_image, kernel):
     x, y = cuda.grid(2)
@@ -73,22 +71,25 @@ def threshold_kernel(input_image, threshold_low, threshold_high, output_image):
         if input_image[x, y] < threshold_low / 255:
             output_image[x, y] = 0  # Edge below low threshold
         elif input_image[x, y] > threshold_high / 255:
-            output_image[x, y] = 255  # Edge above high threshold
+            output_image[x, y] = 1  # Edge above high threshold
         else:
-            output_image[x, y] = 128  # Potential edge between thresholds
+            output_image[x, y] = 0.5  # Potential edge between thresholds
 
 @cuda.jit
 def hysteresis(input_image, output_image):
     x, y = cuda.grid(2)
     if x >= input_image.shape[0] or y >= input_image.shape[1]:
         return
-    if input_image[x, y] > 254:
+    if input_image[x, y] == 1:
         output_image[x, y] = 1
+        return
+    if input_image[x, y] < 1:
+        output_image[x, y] = 0
         return
     for k in range(-1, 2):
         for l in range(-1, 2):
             if x + k > 0 and x + k <= input_image.shape[0] and y + l > 0 and y + l <= input_image.shape[1]:
-                if input_image[x+k, y+l] > 254:
+                if input_image[x+k, y+l] == 1:
                     output_image[x, y] = 1
                     return
     output_image[x, y] = 0; 
@@ -132,16 +133,14 @@ hysteresised_image = cuda.to_device(hysteresised)
 
 # Définir les dimensions de la grille et des blocs CUDA
 threads_per_block = (16, 16)
-#blocks_per_grid_x = (input_image.shape[0] + threads_per_block[0] - 1) // threads_per_block[0]
-#blocks_per_grid_y = (input_image.shape[1] + threads_per_block[1] - 1) // threads_per_block[1]
 blocks_per_grid = compute_thread_blocks(input_image, threads_per_block)
 
 
-# Appliquer le filtre noir et blanc en utilisant CUDA
+# Appliquer le filtre noir et blanc
 rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, gl_image)
-# Appliquer le flou gaussien en utilisant CUDA
+# Appliquer le flou gaussien
 gaussian_blur_cuda[blocks_per_grid, threads_per_block](gl_image, blurred_image, gaussian_kernel)
-# Appliquer le filtre de Sobel en utilisant CUDA
+# Appliquer le filtre de Sobel
 sobel_kernel[blocks_per_grid, threads_per_block](blurred_image, sobeled_image)
 # appliquer le filtre de seuillage
 threshold_kernel[blocks_per_grid, threads_per_block](sobeled_image, 51, 102, thresoled_image)

@@ -31,11 +31,12 @@ transfer_from_boole("out*")
 images = [f for f in os.listdir() if f.startswith("output_")]
 
 input_image = Image.open(input)
-mixed = Image.new("RGB", ((5 + input_image.size[0]) * len(images), input_image.size[1]) , (255, 255, 255))
+x, y = input_image.size
+mixed = Image.new("RGB", ((5 + x) * (len(images)+1) - 5, y) , (255, 255, 255))
 mixed.paste(input_image, (0, 0))
 # compile all images in one
 for i in range(len(images)):
-    mixed.paste(Image.open(images[i]), ((input_image.size[0] + 5)*i - 5, 0))
+    mixed.paste(Image.open(images[i]), ((x + 5)*(i+1), 0))
 mixed.save("mixed.jpg")
 
 mixed = Image.open("mixed.jpg")
