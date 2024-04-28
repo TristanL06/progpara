@@ -77,6 +77,21 @@ def threshold_kernel(input_image, threshold_low, threshold_high, output_image):
         else:
             output_image[x, y] = 128  # Potential edge between thresholds
 
+@cuda.jit
+def hysteresis(input_image, output_image):
+    x, y = cuda.grid(2)
+    if x >= input_image.shape[0] or y >= input_image.shape[1]:
+        return
+    if input_image[x, y] > 254:
+        output_image[x, y] = 1
+        return
+    for k in range(-1, 2):
+        for l in range(-1, 2):
+            if x + k > 0 and x + k <= input_image.shape[0] and y + l > 0 and y + l <= input_image.shape[1]:
+                if input_image[x+k, y+l] > 254:
+                    output_image[x, y] = 1
+                    return
+    output_image[x, y] = 0; 
 
 # Function to compute the number of thread blocks
 def compute_thread_blocks(imagetab, block_size):
@@ -102,10 +117,18 @@ image = Image.open('input.jpg')
 # Allouer la mémoire GPU pour l'image d'entrée et de sortie
 input_image = np.array(image, dtype=np.float32) / 255
 # On ne garde que les deux premières dimensions, car l'image est en niveaux de gris
-output_image = np.zeros_like(input_image[:, :, 0], dtype=np.float32)
+gl = np.zeros_like(input_image[:, :, 0], dtype=np.float32)
+blurred = np.zeros_like(input_image[:, :, 0], dtype=np.float32)
+sobeled = np.zeros_like(input_image[:, :, 0], dtype=np.float32)
+thresoled = np.zeros_like(input_image[:, :, 0], dtype=np.float32)
+hysteresised = np.zeros_like(input_image[:, :, 0], dtype=np.float32)
 
 d_input_image = cuda.to_device(input_image)
-d_output_image = cuda.to_device(output_image)
+gl_image = cuda.to_device(gl)
+blurred_image = cuda.to_device(blurred)
+sobeled_image = cuda.to_device(sobeled)
+thresoled_image = cuda.to_device(thresoled)
+hysteresised_image = cuda.to_device(hysteresised)
 
 # Définir les dimensions de la grille et des blocs CUDA
 threads_per_block = (16, 16)
@@ -115,21 +138,27 @@ blocks_per_grid = compute_thread_blocks(input_image, threads_per_block)
 
 
 # Appliquer le filtre noir et blanc en utilisant CUDA
-rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, d_output_image)
+rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, gl_image)
 # Appliquer le flou gaussien en utilisant CUDA
-gaussian_blur_cuda[blocks_per_grid, threads_per_block](d_output_image, d_output_image, gaussian_kernel)
+gaussian_blur_cuda[blocks_per_grid, threads_per_block](gl_image, blurred_image, gaussian_kernel)
 # Appliquer le filtre de Sobel en utilisant CUDA
-sobel_kernel[blocks_per_grid, threads_per_block](d_output_image, d_output_image)
+sobel_kernel[blocks_per_grid, threads_per_block](blurred_image, sobeled_image)
 # appliquer le filtre de seuillage
-threshold_kernel[blocks_per_grid, threads_per_block](d_output_image, 51, 102, d_output_image)
+threshold_kernel[blocks_per_grid, threads_per_block](sobeled_image, 51, 102, thresoled_image)
+# appliquer le filtre à hystérésis
+hysteresis[blocks_per_grid, threads_per_block](thresoled_image, hysteresised_image)
 
 # Copier l'image de sortie depuis le GPU vers le CPU
-output_image = d_output_image.copy_to_host()
+out1 = gl_image.copy_to_host()
+out2 = blurred_image.copy_to_host()
+out3 = sobeled_image.copy_to_host()
+out4 = thresoled_image.copy_to_host()
+out5 = hysteresised_image.copy_to_host()
 
-# Normalize and convert back to uint8
-output_image *= 255.0
-output_image = output_image.astype(np.uint8)
-
-# Afficher l'image de sortie
-output_image = Image.fromarray(output_image)
-output_image.save('output.jpg')
+images = [out1, out2, out3, out4, out5]
+# Sauvegarder l'image de sortie
+for i in range(len(images)):
+    images[i] *= 255.0
+    images[i] = images[i].astype(np.uint8)
+    output_image = Image.fromarray(images[i])
+    output_image.save(f'output_{i}.jpg')

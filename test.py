@@ -8,7 +8,7 @@ input = "valve.png"
 def transfer_to_boole(source="", destination=""):
     os.system("scp ./" + source + " boole:projet/" + destination)
 
-def transfer_from_boole(source, destination):
+def transfer_from_boole(source, destination = ""):
     os.system("scp boole:projet/" + source + " ./" + destination)
 
 def execute(commands):
@@ -26,15 +26,17 @@ def execute(commands):
 transfer_to_boole("projet.py")
 transfer_to_boole(input, "input.jpg")
 print(execute(["ls -la","python3 projet.py"]))
-transfer_from_boole("output.jpg", "/output.jpg")
+transfer_from_boole("out*")
 
+images = [f for f in os.listdir() if f.startswith("output_")]
 
-original = Image.open(input)
-transformed = Image.open("output.jpg")
-
-mixed = Image.new("RGB", (original.width + transformed.width + 5, original.height), (255, 255, 255))
-mixed.paste(original, (0, 0))
-mixed.paste(transformed, (original.width + 5, 0))
+input_image = Image.open(input)
+mixed = Image.new("RGB", ((5 + input_image.size[0]) * len(images), input_image.size[1]) , (255, 255, 255))
+mixed.paste(input_image, (0, 0))
+# compile all images in one
+for i in range(len(images)):
+    mixed.paste(Image.open(images[i]), ((input_image.size[0] + 5)*i - 5, 0))
 mixed.save("mixed.jpg")
+
 mixed = Image.open("mixed.jpg")
 mixed.show()
