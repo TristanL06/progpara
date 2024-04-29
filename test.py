@@ -24,8 +24,10 @@ def execute(commands):
     return results
 
 transfer_to_boole("projet.py")
+transfer_to_boole("project-gpu.py")
 transfer_to_boole(input, "input.jpg")
-print(execute(["ls -la","python3 projet.py"]))
+print(execute(["python3 projet.py"]))
+print(execute(["python3 project-gpu.py input.jpg output_test.jpg"]))
 transfer_from_boole("out*")
 
 images = [f for f in os.listdir() if f.startswith("output_")]
