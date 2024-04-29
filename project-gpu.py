@@ -145,40 +145,35 @@ def main():
     # 3. copy the output image from GPU to CPU
     # with this method, we can apply the kernels in sequence with image creation only if needed
     
-    gl = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # gray levels
-    gl_image = cuda.to_device(gl)
+    gl_image = cuda.device_array_like(input_image[:, :, 0]) # black and white image
     rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, gl_image)
     print("bw")
     if args.bw:
         print("Processing time:", time.time() - start_time, "seconds")
         return register_image(gl_image)
     
-    blurred = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # blurred with gaussian kernel
-    blurred_image = cuda.to_device(blurred)
+    blurred_image = cuda.device_array_like(input_image[:, :, 0]) # blurred image with gaussian kernel
     gaussian_blur_cuda[blocks_per_grid, threads_per_block](gl_image, blurred_image, gaussian_kernel)
     print("gauss")
     if args.gauss:
         print("Processing time:", time.time() - start_time, "seconds")
         return register_image(blurred_image)
     
-    sobeled = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # sobel filter applied
-    sobeled_image = cuda.to_device(sobeled)
+    sobeled_image = cuda.device_array_like(input_image[:, :, 0]) # sobeled image
     sobel_kernel[blocks_per_grid, threads_per_block](blurred_image, sobeled_image)
     print("sobel")
     if args.sobel:
         print("Processing time:", time.time() - start_time, "seconds")
         return register_image(sobeled_image)
     
-    thresholded = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # threshold applied (segregate edges from non-edges)
-    thresholded_image = cuda.to_device(thresholded)
+    thresholded_image = cuda.device_array_like(input_image[:, :, 0]) # thresholded image
     threshold_kernel[blocks_per_grid, threads_per_block](sobeled_image, 51, 102, thresholded_image)
     print("threshold")
     if args.threshold:
         print("Processing time:", time.time() - start_time, "seconds")
         return register_image(thresholded_image)
     
-    hysteresised = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # hysteresis applied (connect edges)
-    hysteresised_image = cuda.to_device(hysteresised)
+    hysteresised_image = cuda.device_array_like(input_image[:, :, 0]) # hysteresised image
     hysteresis[blocks_per_grid, threads_per_block](thresholded_image, hysteresised_image)
     print("hysteresis")
     register_image(hysteresised_image)
