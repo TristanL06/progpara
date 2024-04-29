@@ -54,14 +54,14 @@ def sobel_kernel(input_image, output_image):
     if x >= input_image.shape[0] or y >= input_image.shape[1]:
         return
         # Appliquer le filtre de Sobel
-    Gx = float32(0.0)
-    Gy = float32(0.0)
+    gx = float32(0.0)
+    gy = float32(0.0)
     for k in range(-1, 2):
         for l in range(-1, 2):
             if x + k > 0 and x + k <= input_image.shape[0] and y + l > 0 and y + l <= input_image.shape[1]:
-                Gx += input_image[x + k, y + l] * sobel_x_kernel[k + 1, l + 1]
-                Gy += input_image[x + k, y + l] * sobel_y_kernel[k + 1, l + 1]
-    output_image[x, y] = min(sqrt(Gx**2 + Gy**2), 175)
+                gx += input_image[x + k, y + l] * sobel_x_kernel[k + 1, l + 1]
+                gy += input_image[x + k, y + l] * sobel_y_kernel[k + 1, l + 1]
+    output_image[x, y] = min(sqrt(gx**2 + gy**2), 175)
 
 
 @cuda.jit

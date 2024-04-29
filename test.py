@@ -26,11 +26,16 @@ def execute(commands):
 transfer_to_boole("projet.py")
 transfer_to_boole("project-gpu.py")
 transfer_to_boole(input, "input.jpg")
-print(execute(["python3 projet.py"]))
-print(execute(["python3 project-gpu.py input.jpg output_test.jpg"]))
+#print(execute(["python3 projet.py"]))
+print(execute([
+    "python3 project-gpu.py input.jpg output_test1.jpg --bw",
+    "python3 project-gpu.py input.jpg output_test2.jpg --gauss",
+    "python3 project-gpu.py input.jpg output_test3.jpg --sobel",
+    "python3 project-gpu.py input.jpg output_test4.jpg --threshold",
+    "python3 project-gpu.py input.jpg output_test5.jpg"]))
 transfer_from_boole("out*")
 
-images = [f for f in os.listdir() if f.startswith("output_")]
+images = [f for f in os.listdir() if f.startswith("output_test")]
 
 input_image = Image.open(input)
 x, y = input_image.size

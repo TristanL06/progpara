@@ -58,14 +58,14 @@ def sobel_kernel(input_image, output_image):
     if x >= input_image.shape[0] or y >= input_image.shape[1]:
         return
         # Appliquer le filtre de Sobel
-    Gx = float32(0.0)
-    Gy = float32(0.0)
+    gx = float32(0.0)
+    gy = float32(0.0)
     for k in range(-1, 2):
         for l in range(-1, 2):
             if x + k > 0 and x + k <= input_image.shape[0] and y + l > 0 and y + l <= input_image.shape[1]:
-                Gx += input_image[x + k, y + l] * sobel_x_kernel[k + 1, l + 1]
-                Gy += input_image[x + k, y + l] * sobel_y_kernel[k + 1, l + 1]
-    output_image[x, y] = min(sqrt(Gx**2 + Gy**2), 175)
+                gx += input_image[x + k, y + l] * sobel_x_kernel[k + 1, l + 1]
+                gy += input_image[x + k, y + l] * sobel_y_kernel[k + 1, l + 1]
+    output_image[x, y] = min(sqrt(gx**2 + gy**2), 175)
 
 
 @cuda.jit
@@ -150,28 +150,28 @@ def main():
     rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, gl_image)
     print("bw")
     if args.bw:
-        register_image(gl_image)
+        return register_image(gl_image)
     
     blurred = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # blurred with gaussian kernel
     blurred_image = cuda.to_device(blurred)
     gaussian_blur_cuda[blocks_per_grid, threads_per_block](gl_image, blurred_image, gaussian_kernel)
     print("gauss")
     if args.gauss:
-        register_image(blurred_image)
+        return register_image(blurred_image)
     
     sobeled = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # sobel filter applied
     sobeled_image = cuda.to_device(sobeled)
     sobel_kernel[blocks_per_grid, threads_per_block](blurred_image, sobeled_image)
     print("sobel")
     if args.sobel:
-        register_image(sobeled_image)
+        return register_image(sobeled_image)
     
     thresholded = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # threshold applied (segregate edges from non-edges)
     thresholded_image = cuda.to_device(thresholded)
     threshold_kernel[blocks_per_grid, threads_per_block](sobeled_image, 51, 102, thresholded_image)
     print("threshold")
     if args.threshold:
-        register_image(thresholded_image)
+        return register_image(thresholded_image)
     
     hysteresised = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # hysteresis applied (connect edges)
     hysteresised_image = cuda.to_device(hysteresised)
