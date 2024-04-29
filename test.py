@@ -6,7 +6,10 @@ import time
 input = "oazo.png"
 
 def transfer_to_boole(source="", destination=""):
-    os.system("scp ./" + source + " boole:projet/" + destination)
+    if os.path.isfile(source):
+        os.system("scp ./" + source + " boole:projet/" + destination)
+    elif os.path.isdir(source):
+        os.system("scp -r ./" + source + " boole:projet/" + destination)
 
 def transfer_from_boole(source, destination = ""):
     os.system("scp boole:projet/" + source + " ./" + destination)
@@ -23,16 +26,24 @@ def execute(commands):
     results.append("====================================")
     return results
 
-transfer_to_boole("projet.py")
 transfer_to_boole("project-gpu.py")
+
+transfer_to_boole("projet.py")
 transfer_to_boole(input, "input.jpg")
+transfer_to_boole("env.py")
+transfer_to_boole("benchmark.py")
+transfer_to_boole("img", "img")
+
+print(execute(["python3 benchmark.py img output --tb 16"]))
 #print(execute(["python3 projet.py"]))
+"""
 print(execute([
     "python3 project-gpu.py input.jpg output1_bw.jpg --bw",
     "python3 project-gpu.py input.jpg output2_gauss.jpg --gauss",
     "python3 project-gpu.py input.jpg output3_sobel.jpg --sobel",
     "python3 project-gpu.py input.jpg output4_threshold.jpg --threshold",
     "python3 project-gpu.py input.jpg output5_final.jpg"]))
+
 transfer_from_boole("output*")
 print(execute(["rm output*"]))
 
@@ -58,3 +69,4 @@ mixed.save("mixed.jpg")
 
 mixed = Image.open("mixed.jpg")
 mixed.show()
+"""

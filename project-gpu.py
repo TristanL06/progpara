@@ -25,7 +25,7 @@ sobel_y_kernel = np.array([[-1, -2, -1],
 
 # fonction pour passer en niveaux de gris
 @cuda.jit
-def rgb_to_bw_kernel(rgb_img, bw_img):
+def bw_kernel(rgb_img, bw_img):
     x, y = cuda.grid(2)
     if x < rgb_img.shape[0] and y < rgb_img.shape[1]:
         R = rgb_img[x, y, 0]
@@ -35,7 +35,7 @@ def rgb_to_bw_kernel(rgb_img, bw_img):
 
 # Fonction de flou gaussien CUDA
 @cuda.jit
-def gaussian_blur_cuda(input_image, output_image, kernel):
+def gauss_kernel(input_image, output_image, kernel):
     x, y = cuda.grid(2)
     if x < input_image.shape[0] and y < input_image.shape[1]:
         output_pixel_value = 0.0
@@ -45,8 +45,7 @@ def gaussian_blur_cuda(input_image, output_image, kernel):
                 x_i = x + i
                 y_i = y + j
                 if x_i >= 0 and x_i < input_image.shape[0] and y_i >= 0 and y_i < input_image.shape[1]:
-                    output_pixel_value += input_image[x_i,
-                                                      y_i] * kernel[i + 2, j + 2]
+                    output_pixel_value += input_image[x_i, y_i] * kernel[i + 2, j + 2]
                     kernel_sum += kernel[i + 2, j + 2]
         # Normalize by the sum of kernel weights
         output_image[x, y] = output_pixel_value / kernel_sum
@@ -69,7 +68,7 @@ def sobel_kernel(input_image, output_image):
 
 
 @cuda.jit
-def threshold_kernel(input_image, threshold_low, threshold_high, output_image):
+def threshold_kernel(input_image, output_image, threshold_low, threshold_high):
     x, y = cuda.grid(2)
     if x < input_image.shape[0] and y < input_image.shape[1]:
         if input_image[x, y] < threshold_low / 255:
@@ -80,7 +79,7 @@ def threshold_kernel(input_image, threshold_low, threshold_high, output_image):
             output_image[x, y] = 0.5  # Potential edge between thresholds
 
 @cuda.jit
-def hysteresis(input_image, output_image):
+def hysteresis_kernel(input_image, output_image):
     x, y = cuda.grid(2)
     if x >= input_image.shape[0] or y >= input_image.shape[1]:
         return
@@ -146,14 +145,14 @@ def main():
     # with this method, we can apply the kernels in sequence with image creation only if needed
     
     gl_image = cuda.device_array_like(input_image[:, :, 0]) # black and white image
-    rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, gl_image)
+    bw_kernel[blocks_per_grid, threads_per_block](d_input_image, gl_image)
     print("bw")
     if args.bw:
         print("Processing time:", time.time() - start_time, "seconds")
         return register_image(gl_image)
     
     blurred_image = cuda.device_array_like(input_image[:, :, 0]) # blurred image with gaussian kernel
-    gaussian_blur_cuda[blocks_per_grid, threads_per_block](gl_image, blurred_image, gaussian_kernel)
+    gauss_kernel[blocks_per_grid, threads_per_block](gl_image, blurred_image, gaussian_kernel)
     print("gauss")
     if args.gauss:
         print("Processing time:", time.time() - start_time, "seconds")
@@ -167,14 +166,14 @@ def main():
         return register_image(sobeled_image)
     
     thresholded_image = cuda.device_array_like(input_image[:, :, 0]) # thresholded image
-    threshold_kernel[blocks_per_grid, threads_per_block](sobeled_image, 51, 102, thresholded_image)
+    threshold_kernel[blocks_per_grid, threads_per_block](sobeled_image, thresholded_image, 51, 102)
     print("threshold")
     if args.threshold:
         print("Processing time:", time.time() - start_time, "seconds")
         return register_image(thresholded_image)
     
     hysteresised_image = cuda.device_array_like(input_image[:, :, 0]) # hysteresised image
-    hysteresis[blocks_per_grid, threads_per_block](thresholded_image, hysteresised_image)
+    hysteresis_kernel[blocks_per_grid, threads_per_block](thresholded_image, hysteresised_image)
     print("hysteresis")
     register_image(hysteresised_image)
 
