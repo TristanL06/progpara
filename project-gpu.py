@@ -113,20 +113,23 @@ def parse_args():
 
 # Main function
 def main():
+    start_time = time.time()
     args = parse_args()
 
-    # Load input image
+    # Charger l'image
     image = Image.open(args.inputImage)
-    input_image = np.array(image, dtype=np.float32) / 255.0
 
-    # Allocate memory for output image on GPU
-    output_image = np.zeros_like(input_image)
+    # fonction pour sauvegarder l'image en sortie
+    def register_image(image):
+        output_image = image.copy_to_host()
+        output_image *= 255.0
+        output_image = output_image.astype(np.uint8)
+        output_image = Image.fromarray(output_image)
+        output_image.save(args.outputImage)
 
-    # Initialize CUDA device arrays
+    # chargement de l'image en mémoire GPU
+    input_image = np.array(image, dtype=np.float32) / 255
     d_input_image = cuda.to_device(input_image)
-    blurred_image = cuda.to_device(input_image)
-    
-    d_output_image = cuda.to_device(output_image)
 
     # Define block and grid dimensions
     threads_per_block = (args.tb, args.tb)
@@ -134,31 +137,42 @@ def main():
     blocks_per_grid_y = (input_image.shape[1] + threads_per_block[1] - 1) // threads_per_block[1]
     blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y)
 
-    start_time = time.time()
 
     # Perform selected kernels based on command-line arguments
+    # the steps are :
+    # 1. create the output image
+    # 2. apply the kernel
+    # 3. copy the output image from GPU to CPU
+    # with this method, we can apply the kernels in sequence with image creation only if needed
+    
+    gl = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # gray levels
+    gl_image = cuda.to_device(gl)
+    rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, gl_image)
     if args.bw:
-        rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, d_output_image)
-    elif args.sobel:
-        # Implement sobel_kernel and further processing steps
-        pass
-    elif args.threshold:
-        # Implement threshold_kernel and further processing steps
-        pass
-    else:
-        # Perform all kernels
-        rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, d_output_image)
-        gaussian_blur_kernel[blocks_per_grid, threads_per_block](d_output_image, d_input_image, gaussian_kernel)
-        # Implement further processing steps for Sobel and thresholding
-
-    # Copy output image from GPU to CPU
-    output_image = d_output_image.copy_to_host()
-
-    # Normalize and save output image
-    output_image *= 255.0
-    output_image = output_image.astype(np.uint8)
-    output_image = Image.fromarray(output_image)
-    output_image.save(args.outputImage)
+        register_image(gl_image)
+    
+    blurred = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # blurred with gaussian kernel
+    blurred_image = cuda.to_device(blurred)
+    gaussian_blur_cuda[blocks_per_grid, threads_per_block](gl_image, blurred_image, gaussian_kernel)
+    if args.gauss:
+        register_image(blurred_image)
+    
+    sobeled = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # sobel filter applied
+    sobeled_image = cuda.to_device(sobeled)
+    sobel_kernel[blocks_per_grid, threads_per_block](blurred_image, sobeled_image)
+    if args.sobel:
+        register_image(sobeled_image)
+    
+    thresholded = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # threshold applied (segregate edges from non-edges)
+    thresholded_image = cuda.to_device(thresholded)
+    threshold_kernel[blocks_per_grid, threads_per_block](sobeled_image, 51, 102, thresholded_image)
+    if args.threshold:
+        register_image(thresholded_image)
+    
+    hysteresised = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # hysteresis applied (connect edges)
+    hysteresised_image = cuda.to_device(hysteresised)
+    hysteresis[blocks_per_grid, threads_per_block](thresholded_image, hysteresised_image)
+    register_image(hysteresised_image)
 
     end_time = time.time()
     print("Processing time:", end_time - start_time, "seconds")
