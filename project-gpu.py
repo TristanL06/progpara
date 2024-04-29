@@ -150,6 +150,7 @@ def main():
     rgb_to_bw_kernel[blocks_per_grid, threads_per_block](d_input_image, gl_image)
     print("bw")
     if args.bw:
+        print("Processing time:", time.time() - start_time, "seconds")
         return register_image(gl_image)
     
     blurred = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # blurred with gaussian kernel
@@ -157,6 +158,7 @@ def main():
     gaussian_blur_cuda[blocks_per_grid, threads_per_block](gl_image, blurred_image, gaussian_kernel)
     print("gauss")
     if args.gauss:
+        print("Processing time:", time.time() - start_time, "seconds")
         return register_image(blurred_image)
     
     sobeled = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # sobel filter applied
@@ -164,6 +166,7 @@ def main():
     sobel_kernel[blocks_per_grid, threads_per_block](blurred_image, sobeled_image)
     print("sobel")
     if args.sobel:
+        print("Processing time:", time.time() - start_time, "seconds")
         return register_image(sobeled_image)
     
     thresholded = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # threshold applied (segregate edges from non-edges)
@@ -171,6 +174,7 @@ def main():
     threshold_kernel[blocks_per_grid, threads_per_block](sobeled_image, 51, 102, thresholded_image)
     print("threshold")
     if args.threshold:
+        print("Processing time:", time.time() - start_time, "seconds")
         return register_image(thresholded_image)
     
     hysteresised = np.zeros_like(input_image[:, :, 0], dtype=np.float32) # hysteresis applied (connect edges)
