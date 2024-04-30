@@ -3,7 +3,7 @@ import os
 import subprocess
 import time
 
-input = "oazo.png"
+input = "input.jpg"
 
 def transfer_to_boole(source="", destination=""):
     if os.path.isfile(source):
@@ -34,9 +34,9 @@ transfer_to_boole("env.py")
 transfer_to_boole("benchmark.py")
 transfer_to_boole("img", "img")
 
-print(execute(["python3 benchmark.py img output --tb 16"]))
+#print(execute(["python3 benchmark.py img output --tb 16"]))
 #print(execute(["python3 projet.py"]))
-"""
+
 print(execute([
     "python3 project-gpu.py input.jpg output1_bw.jpg --bw",
     "python3 project-gpu.py input.jpg output2_gauss.jpg --gauss",
@@ -45,7 +45,7 @@ print(execute([
     "python3 project-gpu.py input.jpg output5_final.jpg"]))
 
 transfer_from_boole("output*")
-print(execute(["rm output*"]))
+print(execute(["rm -r output*"]))
 
 images = [f for f in os.listdir() if f.startswith("output")]
 
@@ -69,4 +69,3 @@ mixed.save("mixed.jpg")
 
 mixed = Image.open("mixed.jpg")
 mixed.show()
-"""
