@@ -12,6 +12,7 @@ project_gpu = __import__(PROJECT_FILE.replace(".py", ""))
 
 def compute_thread_blocks(imagetab, block_size):
     height, width = imagetab.shape[:2]
+    print(height, width)
     blockspergrid_x = math.ceil(width / block_size[0])
     blockspergrid_y = math.ceil(height / block_size[1])
     blockspergrid = (blockspergrid_y, blockspergrid_x)
@@ -40,9 +41,11 @@ def run_benchmark(input_path, output_path, args):
 
     # Set the thread block size
     block_size = (args.tb, args.tb)
+    print(block_size)
 
     # Compute the grid size
     grid_size = compute_thread_blocks(input_image, block_size)
+    print(grid_size)
 
     # Convert the image to black and white
     s_image = cuda.to_device(input_image)

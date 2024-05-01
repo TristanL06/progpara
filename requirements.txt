@@ -1,0 +1,6 @@
+pip
+pillow
+numpy
+numba
+argparse
+tabulate

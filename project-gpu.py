@@ -2,8 +2,7 @@ import numpy as np
 from numba import cuda, float32
 from PIL import Image
 import argparse
-import time
-from math import sqrt, ceil
+from math import sqrt
 
 
 # CUDA kernel functions for image processing
@@ -112,7 +111,6 @@ def parse_args():
 
 # Main function
 def main():
-    start_time = time.time()
     args = parse_args()
 
     # Charger l'image
@@ -146,39 +144,27 @@ def main():
     
     gl_image = cuda.device_array_like(input_image[:, :, 0]) # black and white image
     bw_kernel[blocks_per_grid, threads_per_block](d_input_image, gl_image)
-    print("bw")
     if args.bw:
-        print("Processing time:", time.time() - start_time, "seconds")
         return register_image(gl_image)
     
     blurred_image = cuda.device_array_like(input_image[:, :, 0]) # blurred image with gaussian kernel
     gauss_kernel[blocks_per_grid, threads_per_block](gl_image, blurred_image, gaussian_kernel)
-    print("gauss")
     if args.gauss:
-        print("Processing time:", time.time() - start_time, "seconds")
         return register_image(blurred_image)
     
     sobeled_image = cuda.device_array_like(input_image[:, :, 0]) # sobeled image
     sobel_kernel[blocks_per_grid, threads_per_block](blurred_image, sobeled_image)
-    print("sobel")
     if args.sobel:
-        print("Processing time:", time.time() - start_time, "seconds")
         return register_image(sobeled_image)
     
     thresholded_image = cuda.device_array_like(input_image[:, :, 0]) # thresholded image
     threshold_kernel[blocks_per_grid, threads_per_block](sobeled_image, thresholded_image, 51, 102)
-    print("threshold")
     if args.threshold:
-        print("Processing time:", time.time() - start_time, "seconds")
         return register_image(thresholded_image)
     
     hysteresised_image = cuda.device_array_like(input_image[:, :, 0]) # hysteresised image
     hysteresis_kernel[blocks_per_grid, threads_per_block](thresholded_image, hysteresised_image)
-    print("hysteresis")
     register_image(hysteresised_image)
-
-    end_time = time.time()
-    print("Processing time:", end_time - start_time, "seconds")
 
 if __name__ == "__main__":
     main()

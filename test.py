@@ -44,6 +44,13 @@ print(execute([
     "python3 project-gpu.py input.jpg output4_threshold.jpg --threshold",
     "python3 project-gpu.py input.jpg output5_final.jpg"]))
 
+print(execute([
+    "python3 project-gpu.py input.jpg output1_bw.jpg --tb 16 --bw",
+    "python3 project-gpu.py input.jpg output2_gauss.jpg --tb 16 --gauss",
+    "python3 project-gpu.py input.jpg output3_sobel.jpg --tb 16 --sobel",
+    "python3 project-gpu.py input.jpg output4_threshold.jpg --tb 16 --threshold",
+    "python3 project-gpu.py input.jpg output5_final.jpg --tb 16"]))
+
 transfer_from_boole("output*")
 print(execute(["rm -r output*"]))
 
